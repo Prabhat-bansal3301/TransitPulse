@@ -74,20 +74,93 @@ Administrators manage:
 
 ## 5. MVP Scope
 
-The initial MVP will include:
+The TransitPulse MVP will consist of three interfaces connected to a centralized backend:
 
-- Android-based GPS tracker
-- Secure location transmission
-- Backend REST API
-- PostgreSQL database
-- PostGIS spatial data support
-- Bus and route management
-- Real-time bus location
+1. Passenger Web Application
+2. Conductor/Tracker Android Application
+3. Basic Admin Dashboard
+
+### 5.1 Passenger Web Application
+
+The passenger application will allow users to:
+
+- View available routes
+- View active bus journeys
+- Select a route or bus
+- View the current bus location on a map
+- View route stops
+- View basic estimated arrival time
+- View the last location update
+
+### 5.2 Conductor/Tracker Android Application
+
+The Android application will be used by the conductor or authorized vehicle operator to start and manage a bus journey.
+
+The application will allow the conductor to:
+
+- Authenticate the device/user
+- Select the assigned bus
+- Select the route
+- Start a journey
+- Collect GPS location
+- Periodically transmit GPS data to the backend
+- View GPS/network connection status
+- End the journey
+
+When a journey is started, the backend will create an active Trip associated with the selected bus and route.
+
+GPS location updates will be associated with that active Trip.
+
+### 5.3 Admin Dashboard
+
+The MVP will include a basic administrative interface for managing:
+
+- Buses
+- Routes
+- Stops
+- Tracking devices
+- Bus/device assignments
+- Basic journey information
+
+The admin dashboard will provide the configuration required for conductors to start valid journeys.
+
+### 5.4 Backend
+
+The backend will provide:
+
+- Authentication
+- Bus management
+- Route management
+- Trip/journey management
+- Device management
+- GPS telemetry ingestion
+- Location validation
+- Location storage
 - Basic ETA calculation
-- Passenger web interface
-- Device authentication
-- Basic API security
-- Logging and monitoring
+- APIs for passenger, conductor, and admin interfaces
+
+### 5.5 Database
+
+The MVP database will store:
+
+- Users
+- Buses
+- Tracking devices
+- Routes
+- Stops
+- Trips
+- GPS locations
+
+PostgreSQL with PostGIS will be used for geographical data.
+
+### 5.6 Real-Time Tracking
+
+The MVP will support periodic GPS updates from the Android tracker.
+
+Initial target:
+
+```text
+GPS update interval: approximately 10–30 seconds
 
 ---
 

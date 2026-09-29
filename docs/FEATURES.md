@@ -51,3 +51,39 @@ Example:
 
 ```text
 Last updated: 15 seconds ago
+
+---
+
+## 2. Conductor / Tracker Features
+
+### 2.1 Authentication
+
+The conductor/tracker application should authenticate before accessing journey functionality.
+
+### 2.2 Select Bus
+
+The conductor can select the assigned bus.
+
+### 2.3 Select Route
+
+The conductor can select the route for the journey.
+
+### 2.4 Start Journey
+
+The conductor can start a journey.
+
+When a journey starts, the backend creates an active Trip associated with the bus and route.
+
+### 2.5 GPS Tracking
+
+After starting a journey, the Android application:
+
+- Collects GPS coordinates
+- Records timestamps
+- Sends location data to the backend
+- Periodically updates the bus location
+
+Initial target:
+
+```text
+GPS update interval: approximately 10–30 seconds
