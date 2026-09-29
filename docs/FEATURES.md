@@ -48,8 +48,6 @@ More advanced ETA models can be introduced later.
 The passenger should be able to see when the bus location was last received.
 
 Example:
-
-```text
 Last updated: 15 seconds ago
 
 ---
