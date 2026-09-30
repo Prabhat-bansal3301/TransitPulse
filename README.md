@@ -95,6 +95,14 @@ In a future production implementation, the Android tracker could be replaced or 
 * REST API
 * WebSockets / real-time communication
 
+#### Backend Setup
+
+```powershell
+python -m venv venv
+.\venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
 ### Database
 
 * PostgreSQL
