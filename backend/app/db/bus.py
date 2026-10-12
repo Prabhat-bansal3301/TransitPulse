@@ -1,3 +1,4 @@
+
 from uuid import UUID
 
 from psycopg.rows import dict_row
@@ -11,9 +12,17 @@ def get_all_buses():
     try:
         with connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute("""
-                SELECT id, bus_number, operator, is_active, created_at
-                FROM buses
-                ORDER BY bus_number;
+                SELECT
+                    b.id,
+                    b.bus_number,
+                    b.operator,
+                    b.depot_id,
+                    d.depot_name,
+                    b.is_active,
+                    b.created_at
+                FROM buses b
+                LEFT JOIN depots d ON b.depot_id = d.id
+                ORDER BY b.bus_number;
             """)
 
             return cursor.fetchall()
@@ -28,9 +37,17 @@ def get_bus_by_id(bus_id: UUID):
     try:
         with connection.cursor(row_factory=dict_row) as cursor:
             cursor.execute("""
-                SELECT id, bus_number, operator, is_active, created_at
-                FROM buses
-                WHERE id = %s;
+                SELECT
+                    b.id,
+                    b.bus_number,
+                    b.operator,
+                    b.depot_id,
+                    d.depot_name,
+                    b.is_active,
+                    b.created_at
+                FROM buses b
+                LEFT JOIN depots d ON b.depot_id = d.id
+                WHERE b.id = %s;
             """, (bus_id,))
 
             return cursor.fetchone()

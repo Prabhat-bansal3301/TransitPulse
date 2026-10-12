@@ -17,12 +17,22 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE depots (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    depot_name VARCHAR(150) UNIQUE NOT NULL,
+    location TEXT,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE buses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     bus_number VARCHAR(50) UNIQUE NOT NULL,
 
     operator VARCHAR(100),
+    
+    depot_id UUID REFERENCES depots(id),
 
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
