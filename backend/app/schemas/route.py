@@ -16,3 +16,7 @@ class RouteResponse(BaseModel):
     description: str | None
     is_active: bool
     created_at: datetime
+
+class RouteStopCreate(BaseModel):
+    stop_id: UUID
+    stop_sequence: int = Field(ge=1)
