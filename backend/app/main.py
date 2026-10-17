@@ -7,10 +7,16 @@ from psycopg.errors import ForeignKeyViolation, UniqueViolation
 from app.db.bus import get_all_buses, get_bus_by_id, create_bus
 from app.schemas.route import RouteResponse, RouteCreate, RouteStopCreate
 from app.db.route import get_all_routes, create_route, get_route_by_id, add_stop_to_route, get_stops_for_route
-
+from app.db.trip import create_trip,get_trip_by_id,get_active_trips,end_trip
+from pydantic import BaseModel
+from app.db.location import create_location,get_latest_location_for_bus
+from app.schemas.location import LocationCreate
 
 app = FastAPI(title="TransitPulse API")
 
+class TripCreate(BaseModel):
+    bus_id: UUID
+    route_id: UUID
 
 @app.get("/api/v1/health")
 def health_check():
@@ -65,6 +71,61 @@ def get_route_stops(route_id: UUID):
         )
 
     return get_stops_for_route(route_id)
+
+
+@app.get("/api/v1/trips/active")
+def read_active_trips():
+    trips = get_active_trips()
+
+    return [
+        {
+            "trip_id": trip["id"],
+            "bus_id": trip["bus_id"],
+            "route_id": trip["route_id"],
+            "device_id": trip["device_id"],
+            "conductor_id": trip["conductor_id"],
+            "status": trip["status"],
+            "started_at": trip["started_at"],
+            "completed_at": trip["completed_at"],
+            "created_at": trip["created_at"],
+        }
+        for trip in trips
+    ]
+
+@app.get("/api/v1/trips/{trip_id}")
+def read_trip(trip_id: UUID):
+    trip = get_trip_by_id(trip_id)
+
+    if trip is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trip not found.",
+        )
+
+    return {
+        "trip_id": trip["id"],
+        "bus_id": trip["bus_id"],
+        "route_id": trip["route_id"],
+        "device_id": trip["device_id"],
+        "conductor_id": trip["conductor_id"],
+        "status": trip["status"],
+        "started_at": trip["started_at"],
+        "completed_at": trip["completed_at"],
+        "created_at": trip["created_at"],
+    }
+
+@app.get("/api/v1/buses/{bus_id}/location")
+def read_latest_bus_location(bus_id: UUID):
+    location = get_latest_location_for_bus(bus_id)
+
+    if location is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No location found for this bus's active trip.",
+        )
+
+    return location
+    
 
 @app.post(
     "/api/v1/admin/stops",
@@ -143,3 +204,74 @@ def create_new_bus(bus_data: BusCreate):
             ) from exc
 
         raise
+
+
+@app.post("/api/v1/trips", status_code=status.HTTP_201_CREATED)
+def start_trip(trip_data: TripCreate):
+    try:
+        trip = create_trip(
+            bus_id=trip_data.bus_id,
+            route_id=trip_data.route_id,
+        )
+        return {
+            "trip_id": trip["id"],
+            "bus_id": trip["bus_id"],
+            "route_id": trip["route_id"],
+            "status": trip["status"],
+            "started_at": trip["started_at"],
+        }
+    except UniqueViolation:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="This bus already has an active trip.",
+        )
+    except ForeignKeyViolation:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="The specified bus or route does not exist.",
+        )
+
+    
+@app.post("/api/v1/trips/{trip_id}/end")
+def finish_trip(trip_id: UUID):
+    trip = end_trip(trip_id)
+
+    if trip is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trip not found or is not active.",
+        )
+
+    return {
+        "trip_id": trip["id"],
+        "bus_id": trip["bus_id"],
+        "route_id": trip["route_id"],
+        "status": trip["status"],
+        "started_at": trip["started_at"],
+        "completed_at": trip["completed_at"],
+    }
+
+
+@app.post("/api/v1/locations", status_code=status.HTTP_201_CREATED)
+def submit_location(location_data: LocationCreate):
+    location = create_location(
+        trip_id=location_data.trip_id,
+        latitude=location_data.latitude,
+        longitude=location_data.longitude,
+        recorded_at=location_data.recorded_at,
+        speed=location_data.speed,
+    )
+
+    if location is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Trip not found or is not active.",
+        )
+
+    return {
+        "success": True,
+        "location_id": location["id"],
+        "trip_id": location["trip_id"],
+        "recorded_at": location["recorded_at"],
+        "received_at": location["received_at"],
+    }

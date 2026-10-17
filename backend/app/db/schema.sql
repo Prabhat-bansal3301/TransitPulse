@@ -139,3 +139,8 @@ CREATE TABLE locations (
 
     received_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+
+CREATE UNIQUE INDEX uq_trips_one_active_per_bus
+ON trips (bus_id)
+WHERE status = 'ACTIVE';
