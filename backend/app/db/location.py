@@ -9,6 +9,7 @@ from app.db.connection import get_connection
 
 def create_location(
     trip_id: UUID,
+    device_id: UUID,
     latitude: float,
     longitude: float,
     recorded_at: datetime,
@@ -22,10 +23,12 @@ def create_location(
                 """
                 SELECT id
                 FROM trips
-                WHERE id = %s AND status = 'ACTIVE'
+                WHERE id = %s
+                  AND device_id = %s
+                  AND status = 'ACTIVE'
                 FOR UPDATE;
                 """,
-                (trip_id,),
+                (trip_id, device_id),
             )
 
             trip = cursor.fetchone()

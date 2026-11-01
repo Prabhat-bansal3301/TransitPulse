@@ -1,5 +1,5 @@
 from uuid import UUID
-from fastapi import FastAPI,HTTPException, status
+from fastapi import FastAPI,HTTPException, status,Depends
 from app.schemas.bus import BusResponse, BusCreate
 from app.db.stop import get_all_stops, create_stop
 from app.schemas.stop import StopCreate, StopResponse
@@ -11,6 +11,9 @@ from app.db.trip import create_trip,get_trip_by_id,get_active_trips,end_trip
 from pydantic import BaseModel
 from app.db.location import create_location,get_latest_location_for_bus
 from app.schemas.location import LocationCreate
+from app.auth import get_current_device
+
+
 
 app = FastAPI(title="TransitPulse API")
 
@@ -125,7 +128,6 @@ def read_latest_bus_location(bus_id: UUID):
         )
 
     return location
-    
 
 @app.post(
     "/api/v1/admin/stops",
@@ -207,45 +209,66 @@ def create_new_bus(bus_data: BusCreate):
 
 
 @app.post("/api/v1/trips", status_code=status.HTTP_201_CREATED)
-def start_trip(trip_data: TripCreate):
+def start_trip(
+    trip_data: TripCreate,
+    device=Depends(get_current_device),
+):
     try:
         trip = create_trip(
             bus_id=trip_data.bus_id,
             route_id=trip_data.route_id,
+            device_id=device["id"],
         )
+
+        if trip is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This device is not authorized for the specified bus.",
+            )
+
         return {
             "trip_id": trip["id"],
             "bus_id": trip["bus_id"],
             "route_id": trip["route_id"],
+            "device_id": trip["device_id"],
             "status": trip["status"],
             "started_at": trip["started_at"],
         }
+
     except UniqueViolation:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="This bus already has an active trip.",
         )
+
     except ForeignKeyViolation:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="The specified bus or route does not exist.",
+            detail="The specified route does not exist.",
         )
 
     
 @app.post("/api/v1/trips/{trip_id}/end")
-def finish_trip(trip_id: UUID):
-    trip = end_trip(trip_id)
+def finish_trip(
+    trip_id: UUID,
+    device=Depends(get_current_device),
+):
+    trip = end_trip(
+        trip_id=trip_id,
+        device_id=device["id"],
+    )
 
     if trip is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trip not found or is not active.",
+            detail="Trip not found, not active, or not assigned to this device.",
         )
 
     return {
         "trip_id": trip["id"],
         "bus_id": trip["bus_id"],
         "route_id": trip["route_id"],
+        "device_id": trip["device_id"],
         "status": trip["status"],
         "started_at": trip["started_at"],
         "completed_at": trip["completed_at"],
@@ -253,9 +276,13 @@ def finish_trip(trip_id: UUID):
 
 
 @app.post("/api/v1/locations", status_code=status.HTTP_201_CREATED)
-def submit_location(location_data: LocationCreate):
+def submit_location(
+    location_data: LocationCreate,
+    device=Depends(get_current_device),
+):
     location = create_location(
         trip_id=location_data.trip_id,
+        device_id=device["id"],
         latitude=location_data.latitude,
         longitude=location_data.longitude,
         recorded_at=location_data.recorded_at,
@@ -265,7 +292,7 @@ def submit_location(location_data: LocationCreate):
     if location is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Trip not found or is not active.",
+            detail="Trip not found, not active, or not assigned to this device.",
         )
 
     return {
