@@ -1,184 +1,236 @@
-# TransitPulse 🚌
+# TransitPulse
 
-**Real-Time Public Transport Tracking & ETA Platform**
+Real-time bus tracking and trip telemetry for public transport.
 
-TransitPulse is a real-time public transport tracking platform designed to help passengers know **where a bus is, whether it is approaching, and approximately when it will arrive**.
+TransitPulse connects an Android tracking device to a FastAPI backend so operators can start trips and send GPS updates, while passenger-facing clients can read routes, buses, stops, trips, and the latest bus locations.
 
-The initial goal is to solve a common problem with regular public buses: passengers often have little or no reliable information about the current location of their bus, resulting in long and uncertain waiting times.
+> **Project status:** Active prototype. The backend and Android tracker are under development; the passenger web frontend is not implemented yet.
 
-## 🎯 Problem
+## What is included
 
-Many public transport systems do not provide reliable real-time tracking for all buses, particularly regular/non-premium services.
+- **FastAPI backend** for buses, routes, stops, trips, and location telemetry
+- **PostgreSQL + PostGIS schema** for transport and geospatial data
+- **Device authentication** with hashed bearer tokens
+- **Android tracker app** using Java, Retrofit, Fused Location Provider, and a foreground service
+- **Operational scripts** for registering devices and rotating device tokens
+- **API and product documentation** in [`docs/`](docs/)
 
-Passengers may have to wait at a bus stop for a long time without knowing:
-
-* Where the bus currently is
-* Whether the bus has started its route
-* Whether it is approaching their stop
-* When it is expected to arrive
-* Whether they should wait or choose another mode of transport
-
-TransitPulse aims to provide this information through a simple web platform.
-
-## 💡 Proposed Solution
-
-TransitPulse will collect the real-time GPS location of a bus and send it to a central backend.
-
-The system will process the location data and provide passengers with:
-
-* Live bus location
-* Route information
-* Last location update
-* Estimated Time of Arrival (ETA)
-* Bus activity/status
-
-### Initial Prototype
-
-For the prototype, an Android phone will act as the vehicle's GPS tracking device.
+## Architecture
 
 ```text
-Android GPS Tracker
-        ↓
-   Internet / API
-        ↓
- Python Backend
-        ↓
- PostgreSQL/PostGIS
-        ↓
- ETA / Location Engine
-        ↓
- Passenger Web Platform
+Android tracker
+  └─ starts a trip and sends GPS telemetry
+       │
+       ▼
+FastAPI REST API (/api/v1)
+  ├─ public passenger read endpoints
+  └─ authenticated tracker write endpoints
+       │
+       ▼
+PostgreSQL + PostGIS
+  ├─ buses, routes, stops, and route stops
+  ├─ devices and active trips
+  └─ historical GPS locations
 ```
 
-In a future production implementation, the Android tracker could be replaced or integrated with an existing **ETM/POS/vehicle tracking system** used by a transport corporation, subject to access and authorization from the transport operator.
-
-## 🏗️ Project Architecture
+## Repository layout
 
 ```text
-┌─────────────────────┐
-│   GPS Tracker       │
-│   Android / ETM     │
-└──────────┬──────────┘
-           │
-           │ Location Data
-           ▼
-┌─────────────────────┐
-│   FastAPI Backend   │
-│   Python            │
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│ PostgreSQL +        │
-│ PostGIS             │
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│ Location / ETA      │
-│ Processing Engine   │
-└──────────┬──────────┘
-           │
-           ▼
-┌─────────────────────┐
-│ Passenger Web App   │
-│ Maps + Bus Status   │
-└─────────────────────┘
+backend/     FastAPI application, database access, schemas, and admin scripts
+docs/        API, database, feature, product, roadmap, and stack documentation
+frontend/    Reserved for the passenger web application
+tracker/     Android tracking application
 ```
 
-## 🛠️ Technology Stack
+## Technology stack
 
-### Backend
+| Area | Technologies |
+| --- | --- |
+| Backend | Python, FastAPI, Pydantic, Uvicorn |
+| Database | PostgreSQL, PostGIS, Psycopg |
+| Tracker | Java, Android SDK, Fused Location Provider, Retrofit |
+| API format | Versioned REST API, JSON |
+| Authentication | Bearer device tokens stored as SHA-256 hashes |
 
-* Python
-* FastAPI
-* REST API
-* WebSockets / real-time communication
+## Backend setup
 
-#### Backend Setup
+### Requirements
 
-```powershell
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+- Python 3.10+
+- PostgreSQL with the PostGIS extension
+- A database created for TransitPulse
+
+### Install dependencies
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### Database
+On Windows PowerShell:
 
-* PostgreSQL
-* PostGIS
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
 
-### GPS Tracker
+### Configure the database
 
-* Android
-* Java
-* Android Location APIs
+The backend reads these variables from the environment or a `backend/.env` file:
 
-### Frontend
+```env
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_NAME=transitpulse
+DATABASE_USER=postgres
+DATABASE_PASSWORD=your-password
+```
 
-* HTML
-* CSS
-* JavaScript
-* Map API
+Apply the schema to a PostGIS-enabled database:
 
-### Infrastructure
+```bash
+psql "$DATABASE_URL" -f backend/app/db/schema.sql
+```
 
-* Linux
-* Docker
-* Git & GitHub
+If `DATABASE_URL` is not configured in your shell, run `psql` with the connection options for your local PostgreSQL installation.
 
-### Security
+### Start the API
 
-Security will be considered throughout the system, including:
+From the `backend/` directory:
 
-* API authentication
-* Device authentication
-* Secure communication
-* Input validation
-* Rate limiting
-* Protection against unauthorized location submissions
-* Detection/mitigation of manipulated GPS data
+```bash
+uvicorn app.main:app --reload
+```
 
-## 🚧 Current Status
+The API is then available at `http://127.0.0.1:8000`.
 
-**Project Stage: Planning / Initial Development**
+- Health check: `GET /api/v1/health`
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- ReDoc: `http://127.0.0.1:8000/redoc`
 
-The current project is a prototype and is **not yet connected to any transport corporation's production systems**.
+## Device registration
 
-The initial implementation will use a controlled Android GPS tracker to simulate the data source that could eventually be provided by a vehicle tracking system or ETM/POS device.
+Register a tracker device from the `backend/` directory:
 
-## 🗺️ Future Roadmap
+```bash
+python register_device.py <device_identifier> [bus_id]
+```
 
-* [ ] Project architecture
-* [ ] Backend API
-* [ ] Database design
-* [ ] Android GPS tracker
-* [ ] Live location ingestion
-* [ ] Passenger web interface
-* [ ] Interactive map
-* [ ] Route management
-* [ ] ETA calculation
-* [ ] Real-time updates
-* [ ] Authentication & authorization
-* [ ] Security testing
-* [ ] Cloud deployment
-* [ ] Performance testing
-* [ ] Transport corporation integration
-* [ ] Dedicated passenger mobile application
+The command prints the device token once. Store it securely; only its hash is persisted by the backend.
 
-## 👥 Team
+To rotate a device token, update the configured device ID in `backend/rotate_device_token.py` and run:
 
-TransitPulse is being developed as a two-person project.
+```bash
+python rotate_device_token.py
+```
 
-* **Developer 1:** Backend, cybersecurity, infrastructure & system architecture
-* **Developer 2:** Android/Java, GPS tracking & mobile development
+## API overview
 
-## ⚠️ Disclaimer
+All current endpoints are versioned under `/api/v1`.
 
-TransitPulse is currently an independent prototype.
+### Public read endpoints
 
-Any future integration with transport corporations, ETM/POS devices, vehicle tracking systems, or their backend infrastructure will require appropriate authorization and cooperation from the respective organization.
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| GET | `/health` | Check API availability |
+| GET | `/buses` | List buses |
+| GET | `/buses/{bus_id}` | Get a bus |
+| GET | `/buses/{bus_id}/location` | Get the latest location for a bus |
+| GET | `/routes` | List routes |
+| GET | `/routes/{route_id}` | Get a route |
+| GET | `/routes/{route_id}/stops` | List stops on a route |
+| GET | `/stops` | List stops |
+| GET | `/trips/active` | List active trips |
+| GET | `/trips/{trip_id}` | Get a trip |
 
----
+### Authenticated tracker endpoints
 
-**TransitPulse — Know your bus. Know when it's coming.**
+Send a device token in the request header:
+
+```http
+Authorization: Bearer <device-token>
+```
+
+| Method | Endpoint | Purpose |
+| --- | --- | --- |
+| POST | `/trips` | Start a trip for a bus and route |
+| POST | `/trips/{trip_id}/end` | End an active trip |
+| POST | `/locations` | Submit GPS telemetry for an active trip |
+
+Example location payload:
+
+```json
+{
+  "trip_id": "00000000-0000-0000-0000-000000000000",
+  "latitude": 29.8543,
+  "longitude": 77.888,
+  "recorded_at": "2026-11-11T16:00:00Z",
+  "speed": 35.5
+}
+```
+
+The backend validates coordinate ranges, requires a timezone-aware timestamp, and rejects timestamps more than two minutes in the future.
+
+Administrative creation endpoints for buses, routes, and stops are currently available under `/api/v1/admin/`; see [`docs/API.md`](docs/API.md) for request details.
+
+## Android tracker
+
+The Android project is located at [`tracker/android/`](tracker/android/). It currently:
+
+- Loads buses and routes from the backend
+- Starts and ends trips through the API
+- Runs GPS collection in an Android foreground service
+- Sends latitude, longitude, speed, and UTC timestamps
+- Adds a bearer token when configured
+
+The emulator API URL defaults to:
+
+```text
+http://10.0.2.2:8000/
+```
+
+This maps to the host machine's port 8000 from an Android emulator. Change `BASE_URL` in `RetrofitClient.java` when using a physical device or a deployed API.
+
+Open `tracker/android/` in Android Studio and run the `app` configuration. Location permissions and a reachable backend are required for live tracking.
+
+## Data model
+
+The database schema includes:
+
+- Users and depots
+- Buses and registered tracking devices
+- Routes, stops, and ordered route stops
+- Trips with `CREATED`, `ACTIVE`, and `COMPLETED` states
+- GPS locations associated with trips
+
+An enforced partial unique index prevents more than one active trip from running for the same bus.
+
+## Documentation
+
+- [`docs/API.md`](docs/API.md) — API contract and access model
+- [`docs/DATABASE.md`](docs/DATABASE.md) — database design
+- [`docs/FEATURES.md`](docs/FEATURES.md) — planned and implemented feature scope
+- [`docs/PRD.md`](docs/PRD.md) — product requirements
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — development phases
+- [`docs/TECHSTACK.md`](docs/TECHSTACK.md) — technology choices
+- [`docs/USERFLOW.md`](docs/USERFLOW.md) — user flows
+
+## Roadmap
+
+- Improve device and admin authentication flows
+- Add ETA calculation and route-aware arrival estimates
+- Build the passenger web interface with live map updates
+- Add an admin dashboard for buses, routes, stops, devices, and trips
+- Add automated tests, deployment configuration, and monitoring
+
+## Disclaimer
+
+TransitPulse is an independent prototype. Integration with transport operators, vehicle tracking systems, ETM/POS devices, or production infrastructure requires authorization from the relevant organization.
+
+## License
+
+No license has been published for this repository yet.
